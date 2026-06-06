@@ -1,0 +1,51 @@
+name: VPN Watchdog
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # каждые 5 минут
+  workflow_dispatch:          # ручной запуск
+
+jobs:
+  watchdog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - name: Check SSH reachability
+        id: ping
+        run: |
+          if nc -z -w 10 ${{ secrets.VPN_HOST }} 22; then
+            echo "reachable=true" >> $GITHUB_OUTPUT
+          else
+            echo "reachable=false" >> $GITHUB_OUTPUT
+            echo "::error::Server ${{ secrets.VPN_HOST }} is UNREACHABLE on port 22!"
+          fi
+
+      - name: Check and restart OpenVPN if down
+        if: steps.ping.outputs.reachable == 'true'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPN_HOST }}
+          username: root
+          password: ${{ secrets.VPN_PASS }}
+          port: 22
+          command_timeout: 60s
+          script: |
+            NEEDS_RESTART=false
+            for svc in antizapret-openvpn-udp antizapret-openvpn-tcp; do
+              if ! systemctl is-active --quiet "$svc"; then
+                echo "$(date '+%Y-%m-%d %H:%M:%S') WATCHDOG: $svc is DOWN" >> /root/watchdog.log
+                NEEDS_RESTART=true
+              fi
+            done
+
+            if [ "$NEEDS_RESTART" = "true" ]; then
+              systemctl restart antizapret-openvpn-udp antizapret-openvpn-tcp
+              sleep 3
+              echo "$(date '+%Y-%m-%d %H:%M:%S') WATCHDOG: Restarted services" >> /root/watchdog.log
+              systemctl is-active antizapret-openvpn-udp >> /root/watchdog.log
+              systemctl is-active antizapret-openvpn-tcp >> /root/watchdog.log
+              # Держим лог не больше 500 строк
+              tail -500 /root/watchdog.log > /root/watchdog.log.tmp
+              mv /root/watchdog.log.tmp /root/watchdog.log
+            fi
