@@ -34,18 +34,10 @@ jobs:
             NEEDS_RESTART=false
             for svc in antizapret-openvpn-udp antizapret-openvpn-tcp; do
               if ! systemctl is-active --quiet "$svc"; then
-                echo "$(date '+%Y-%m-%d %H:%M:%S') WATCHDOG: $svc is DOWN" >> /root/watchdog.log
                 NEEDS_RESTART=true
               fi
             done
 
             if [ "$NEEDS_RESTART" = "true" ]; then
               systemctl restart antizapret-openvpn-udp antizapret-openvpn-tcp
-              sleep 3
-              echo "$(date '+%Y-%m-%d %H:%M:%S') WATCHDOG: Restarted services" >> /root/watchdog.log
-              systemctl is-active antizapret-openvpn-udp >> /root/watchdog.log
-              systemctl is-active antizapret-openvpn-tcp >> /root/watchdog.log
-              # Держим лог не больше 500 строк
-              tail -500 /root/watchdog.log > /root/watchdog.log.tmp
-              mv /root/watchdog.log.tmp /root/watchdog.log
             fi
