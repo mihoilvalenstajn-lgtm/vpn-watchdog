@@ -10,7 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
 
-
     steps:
       - name: Check SSH reachability
         id: ping
@@ -33,12 +32,12 @@ jobs:
           command_timeout: 60s
           script: |
             NEEDS_RESTART=false
-            for svc in antizapret-openvpn-udp antizapret-openvpn-tcp; do
+            for svc in openvpn-server@antizapret-udp openvpn-server@antizapret-tcp openvpn-server@vpn-udp openvpn-server@vpn-tcp; do
               if ! systemctl is-active --quiet "$svc"; then
                 NEEDS_RESTART=true
               fi
             done
 
             if [ "$NEEDS_RESTART" = "true" ]; then
-              systemctl restart antizapret-openvpn-udp antizapret-openvpn-tcp
+              systemctl restart openvpn-server@antizapret-udp openvpn-server@antizapret-tcp openvpn-server@vpn-udp openvpn-server@vpn-tcp
             fi
